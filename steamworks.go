@@ -5,9 +5,65 @@
 
 package steamworks
 
+import "fmt"
+
 type AppId_t uint32
 type CSteamID uint64
+type HAuthTicket uint32
 type InputHandle_t uint64
+
+// HAuthTicketInvalid is the ticket handle returned when a ticket request fails.
+const HAuthTicketInvalid HAuthTicket = 0
+
+type EResult int32
+
+const (
+	EResultNone                  EResult = 0
+	EResultOK                    EResult = 1
+	EResultFail                  EResult = 2
+	EResultNoConnection          EResult = 3
+	EResultInvalidPassword       EResult = 5
+	EResultInvalidProtocolVer    EResult = 7
+	EResultInvalidParam          EResult = 8
+	EResultBusy                  EResult = 10
+	EResultInvalidState          EResult = 11
+	EResultTimeout               EResult = 16
+	EResultNotLoggedOn           EResult = 21
+	EResultPending               EResult = 22
+	EResultInsufficientPrivilege EResult = 24
+)
+
+func (e EResult) String() string {
+	switch e {
+	case EResultNone:
+		return "None"
+	case EResultOK:
+		return "OK"
+	case EResultFail:
+		return "Fail"
+	case EResultNoConnection:
+		return "NoConnection"
+	case EResultInvalidPassword:
+		return "InvalidPassword"
+	case EResultInvalidProtocolVer:
+		return "InvalidProtocolVer"
+	case EResultInvalidParam:
+		return "InvalidParam"
+	case EResultBusy:
+		return "Busy"
+	case EResultInvalidState:
+		return "InvalidState"
+	case EResultTimeout:
+		return "Timeout"
+	case EResultNotLoggedOn:
+		return "NotLoggedOn"
+	case EResultPending:
+		return "Pending"
+	case EResultInsufficientPrivilege:
+		return "InsufficientPrivilege"
+	}
+	return fmt.Sprintf("Unknown(%d)", int(e))
+}
 
 type ESteamAPIInitResult int32
 
@@ -84,6 +140,22 @@ type ISteamRemoteStorage interface {
 
 type ISteamUser interface {
 	GetSteamID() CSteamID
+	// GetAuthTicketForWebApi requests an auth ticket for the Steam Web API
+	// (validated server-side with ISteamUserAuth/AuthenticateUserTicket).
+	// The ticket bytes are delivered asynchronously through the
+	// GetTicketForWebApiResponse_t callback; use WebApiAuthTicket to obtain
+	// them. identity optionally names the service the ticket is sent to.
+	GetAuthTicketForWebApi(identity string) HAuthTicket
+	CancelAuthTicket(ticket HAuthTicket)
+}
+
+// GetTicketForWebApiResponse is the result of a GetAuthTicketForWebApi
+// request, delivered via the GetTicketForWebApiResponse_t callback.
+type GetTicketForWebApiResponse struct {
+	Handle HAuthTicket
+	Result EResult
+	// Ticket is a credential for the Steam Web API; do not log it.
+	Ticket []byte
 }
 
 type ISteamUserStats interface {
@@ -158,8 +230,10 @@ const (
 	flatAPI_ISteamRemoteStorage_FileDelete  = "SteamAPI_ISteamRemoteStorage_FileDelete"
 	flatAPI_ISteamRemoteStorage_GetFileSize = "SteamAPI_ISteamRemoteStorage_GetFileSize"
 
-	flatAPI_SteamUser             = "SteamAPI_SteamUser_v023"
-	flatAPI_ISteamUser_GetSteamID = "SteamAPI_ISteamUser_GetSteamID"
+	flatAPI_SteamUser                         = "SteamAPI_SteamUser_v023"
+	flatAPI_ISteamUser_GetSteamID             = "SteamAPI_ISteamUser_GetSteamID"
+	flatAPI_ISteamUser_GetAuthTicketForWebApi = "SteamAPI_ISteamUser_GetAuthTicketForWebApi"
+	flatAPI_ISteamUser_CancelAuthTicket       = "SteamAPI_ISteamUser_CancelAuthTicket"
 
 	flatAPI_SteamUserStats                   = "SteamAPI_SteamUserStats_v013"
 	flatAPI_ISteamUserStats_GetAchievement   = "SteamAPI_ISteamUserStats_GetAchievement"
