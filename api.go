@@ -126,12 +126,21 @@ func registerFunctions(lib uintptr) {
 	purego.RegisterLibFunc(&ptrAPI_ISteamUtils_ShowFloatingGamepadTextInput, lib, flatAPI_ISteamUtils_ShowFloatingGamepadTextInput)
 }
 
-var theLib *lib
+var (
+	theLib  *lib
+	loadErr error
+)
 
 func init() {
 	l, err := loadLib()
 	if err != nil {
-		panic(err)
+		// The embedded SDK library could not be loaded on this system
+		// (e.g. the glibc library on a musl system). Do not panic: a
+		// build that links this package must still degrade gracefully
+		// where the SDK cannot load — Init reports the error and the
+		// host's log-and-continue path keeps the game fully playable.
+		loadErr = err
+		return
 	}
 	registerFunctions(l)
 	theLib = &lib{
@@ -139,11 +148,25 @@ func init() {
 	}
 }
 
+// LoadError reports why the SDK library could not be loaded, if it could
+// not. When non-nil, RestartAppIfNecessary, Init, and RunCallbacks are
+// safe no-ops/errors, and the service accessors (SteamApps, SteamUser,
+// ...) must not be used.
+func LoadError() error {
+	return loadErr
+}
+
 func RestartAppIfNecessary(appID uint32) bool {
+	if loadErr != nil {
+		return false
+	}
 	return ptrAPI_RestartAppIfNecessary(appID)
 }
 
 func Init() error {
+	if loadErr != nil {
+		return loadErr
+	}
 	var msg steamErrMsg
 	if ptrAPI_InitFlat(&msg) != ESteamAPIInitResult_OK {
 		return fmt.Errorf("steamworks: InitFlat failed: %s", msg.String())
@@ -152,6 +175,9 @@ func Init() error {
 }
 
 func RunCallbacks() {
+	if loadErr != nil {
+		return
+	}
 	ptrAPI_RunCallbacks()
 }
 
